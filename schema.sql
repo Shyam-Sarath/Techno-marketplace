@@ -337,6 +337,56 @@ on conflict (name) do nothing;
 
 
 -- ─────────────────────────────────────────────
+-- RPC FUNCTION: ASSIGN TECHNOLOGY
+-- (Performs all updates in a single ACID transaction)
+-- ─────────────────────────────────────────────
+create or replace function public.assign_technology(
+  p_technology_id uuid,
+  p_team_id uuid,
+  p_bid_amount integer,
+  p_phase text
+)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_team_purse integer;
+begin
+  -- 1. Get and verify the team's purse
+  select purse into v_team_purse from public.teams where id = p_team_id;
+  if v_team_purse is null then
+    raise exception 'Team not found';
+  end if;
+  if v_team_purse < p_bid_amount then
+    raise exception 'Insufficient purse budget';
+  end if;
+
+  -- 2. Deduct bid amount from team's purse
+  update public.teams
+  set purse = purse - p_bid_amount
+  where id = p_team_id;
+
+  -- 3. Mark technology as sold
+  update public.technologies
+  set is_sold = true,
+      sold_to_team_id = p_team_id,
+      sold_price = p_bid_amount
+  where id = p_technology_id;
+
+  -- 4. Insert transaction record
+  insert into public.transactions (technology_id, team_id, bid_amount, phase)
+  values (p_technology_id, p_team_id, p_bid_amount, p_phase);
+
+  -- 5. Clear current technology in event state
+  update public.event_state
+  set current_technology_id = null
+  where id = 1;
+end;
+$$;
+
+
+-- ─────────────────────────────────────────────
 -- HELPER VIEW — current auction snapshot
 -- ─────────────────────────────────────────────
 create or replace view public.auction_snapshot as
