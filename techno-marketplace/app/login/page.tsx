@@ -66,11 +66,38 @@ export default function LoginPage() {
           return
         }
 
-        const team = teams?.[0] ?? null
+        let team = teams?.[0] ?? null
+        if (!team) {
+          // Auto-register team on first login
+          const { data: allTeams } = await supabase
+            .from('teams')
+            .select('team_number')
+          
+          const existingNumbers = allTeams?.map((t) => t.team_number) ?? []
+          const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1
+
+          const { data: newTeam, error: insertErr } = await supabase
+            .from('teams')
+            .insert({
+              team_number: nextNumber,
+              team_name: name,
+              purse: 100000
+            })
+            .select()
+            .single()
+
+          if (insertErr) {
+            setError('Failed to auto-register team. Please try again.')
+            setLoading(false)
+            return
+          }
+          team = newTeam
+        }
+
         saveSession({
           role: 'team',
-          teamName: team?.team_name ?? name,
-          teamId: team?.id ?? null,
+          teamName: team.team_name,
+          teamId: team.id,
         })
         router.push('/team/dashboard')
       }
