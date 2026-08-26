@@ -144,20 +144,37 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            width: '64px', height: '64px', borderRadius: '18px',
-            background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-            boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
-            marginBottom: '16px', fontSize: '28px',
-          }}>
-            ⚡
-          </div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '6px', letterSpacing: '-0.03em' }}>
+          <img
+            src="/placexp_logo.png"
+            alt="PLACE-XP Logo"
+            style={{
+              display: 'inline-block',
+              width: '80px',
+              height: '80px',
+              borderRadius: '20px',
+              boxShadow: '0 8px 32px rgba(99,102,241,0.25)',
+              marginBottom: '16px',
+              objectFit: 'contain',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          />
+          <h1 style={{ fontSize: '28px', fontWeight: 800, marginBottom: '4px', letterSpacing: '-0.03em' }}>
             Tech <span className="gradient-text">Marketplace</span>
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            PLACE-XP Auction Platform
+          <div style={{
+            fontFamily: 'Space Grotesk',
+            fontSize: '11px',
+            fontWeight: 700,
+            letterSpacing: '0.18em',
+            color: 'var(--gold-light)',
+            textTransform: 'uppercase',
+            marginTop: '4px',
+            marginBottom: '4px',
+          }}>
+            ENGAGE · EQUIP · EXECUTE
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+            Official PLACE-XP-VITC Auction Arena
           </p>
         </div>
 

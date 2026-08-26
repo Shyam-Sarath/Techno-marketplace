@@ -124,9 +124,19 @@ export default function GoldenPowerPage() {
         {/* Header */}
         <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <button className="btn btn-secondary btn-sm" style={{ marginBottom: '16px' }} onClick={() => router.push('/admin/auction')}>
-              ← Back
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => router.push('/admin/auction')}>
+                ← Back
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <img src="/placexp_logo.png" alt="Logo" style={{ width: '28px', height: '28px', borderRadius: '6px', objectFit: 'contain' }} />
+                <div>
+                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'var(--gold-light)', fontFamily: 'Space Grotesk', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    ENGAGE · EQUIP · EXECUTE
+                  </div>
+                </div>
+              </div>
+            </div>
             <h1 style={{ fontSize: '28px', fontWeight: 800 }}>
               <span className="gradient-text-gold">⭐ Golden Powers</span>
             </h1>

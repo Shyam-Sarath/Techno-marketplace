@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getSession, clearSession, saveSession } from '@/lib/session'
-import { TechnologyCard } from '@/components/TechnologyCard'
+import { CardSpread } from '@/components/CardSpread'
 import { TeamPurseTable } from '@/components/TeamPurseTable'
 import { TechnologyInventory } from '@/components/TechnologyInventory'
 import type { EventState, Technology, Team } from '@/lib/types'
@@ -107,10 +107,23 @@ export default function TeamDashboardPage() {
           height: '60px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>⚡</span>
-            <span style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: '16px' }}>
-              Tech Marketplace
-            </span>
+            <img src="/placexp_logo.png" alt="PLACE-XP Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'contain' }} />
+            <div>
+              <span style={{ fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)' }}>
+                Tech Marketplace
+              </span>
+              <div style={{
+                fontFamily: 'Space Grotesk',
+                fontSize: '9px',
+                fontWeight: 600,
+                color: 'var(--gold-light)',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                marginTop: '-1px'
+              }}>
+                ENGAGE · EQUIP · EXECUTE
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -224,7 +237,7 @@ export default function TeamDashboardPage() {
                     📡 Currently on Auction
                   </div>
                   <AnimatePresence mode="wait">
-                    <TechnologyCard
+                    <CardSpread
                       key={currentTech?.id ?? 'empty'}
                       technology={currentTech}
                       owner={currentTech?.sold_to_team_id ? teamMap[currentTech.sold_to_team_id] : null}

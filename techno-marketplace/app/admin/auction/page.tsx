@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { getSession, clearSession } from '@/lib/session'
-import { TechnologyCard } from '@/components/TechnologyCard'
+import { CardSpread } from '@/components/CardSpread'
 import { TeamPurseTable } from '@/components/TeamPurseTable'
 import { TechnologyInventory } from '@/components/TechnologyInventory'
 import type { EventState, Technology, Team, Transaction } from '@/lib/types'
@@ -29,6 +29,10 @@ export default function AdminAuctionPage() {
   // Add team form
   const [newTeamName, setNewTeamName] = useState('')
   const [addingTeam, setAddingTeam] = useState(false)
+
+  // Edit purse modal state
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const [editPurseValue, setEditPurseValue] = useState('')
 
   const [activeTab, setActiveTab] = useState<'auction' | 'teams' | 'history'>('auction')
   const [loading, setLoading] = useState(true)
@@ -90,6 +94,7 @@ export default function AdminAuctionPage() {
       phase: 'CATEGORY_A',
       started_at: new Date().toISOString(),
     }).eq('id', 1)
+    await loadData()
   }
 
   async function chooseNextTechnology() {
@@ -100,6 +105,7 @@ export default function AdminAuctionPage() {
     const pick = unsold[Math.floor(Math.random() * unsold.length)]
     setCurrentTech(pick)
     await supabase.from('event_state').update({ current_technology_id: pick.id }).eq('id', 1)
+    await loadData()
   }
 
   async function assignTechnology() {
@@ -149,6 +155,7 @@ export default function AdminAuctionPage() {
       category_b_started_at: new Date().toISOString(),
       current_technology_id: null,
     }).eq('id', 1)
+    await loadData()
   }
 
   async function finishAuction() {
@@ -157,6 +164,7 @@ export default function AdminAuctionPage() {
       completed_at: new Date().toISOString(),
       current_technology_id: null,
     }).eq('id', 1)
+    await loadData()
   }
 
   async function addTeam() {
@@ -172,6 +180,67 @@ export default function AdminAuctionPage() {
     setNewTeamName('')
     setAddingTeam(false)
     await loadData()
+  }
+
+  async function savePurseEdit() {
+    if (!editingTeam) return
+    const n = parseInt(editPurseValue)
+    if (isNaN(n) || n < 0) return
+    await supabase.from('teams').update({ purse: n }).eq('id', editingTeam.id)
+    setEditingTeam(null)
+    await loadData()
+  }
+
+  async function skipCurrentTechnology() {
+    if (!currentTech) return
+    setAssigning(true)
+    await supabase.from('event_state').update({ current_technology_id: null }).eq('id', 1)
+    setWinningTeamId('')
+    setBidAmount('')
+    setCurrentTech(null)
+    setAssigning(false)
+    await loadData()
+  }
+
+  async function resetAuction() {
+    if (!confirm('Are you absolutely sure you want to RESET the entire auction? This will delete all registered teams, void all transactions, delete golden swaps, and reset all technologies. This cannot be undone.')) {
+      return
+    }
+    setLoading(true)
+    try {
+      // 1. Delete all transactions, golden swaps, presentation orders
+      await Promise.all([
+        supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('golden_swaps').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+        supabase.from('presentation_orders').delete().neq('id', '00000000-0000-0000-0000-000000000000'),
+      ])
+
+      // 2. Reset technologies
+      await supabase.from('technologies').update({
+        is_sold: false,
+        sold_to_team_id: null,
+        sold_price: null,
+      }).neq('id', '00000000-0000-0000-0000-000000000000')
+
+      // 3. Delete all teams
+      await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+
+      // 4. Reset event state
+      await supabase.from('event_state').update({
+        phase: 'NOT_STARTED',
+        current_technology_id: null,
+        started_at: null,
+        category_b_started_at: null,
+        completed_at: null,
+      }).eq('id', 1)
+
+      alert('Database successfully reset to clean state!')
+      await loadData()
+    } catch (err) {
+      alert('Failed to reset database: ' + err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   function signOut() {
@@ -210,19 +279,35 @@ export default function AdminAuctionPage() {
           height: '60px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span style={{ fontSize: '20px' }}>⚡</span>
-            <span style={{
-              fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: '16px',
-            }}>
-              Tech Marketplace
-            </span>
-            <span style={{
-              padding: '2px 8px', background: 'rgba(239,68,68,0.15)',
-              color: '#f87171', borderRadius: '6px', fontSize: '11px', fontWeight: 700,
-              border: '1px solid rgba(239,68,68,0.2)', letterSpacing: '0.06em',
-            }}>
-              ADMIN
-            </span>
+            <img src="/placexp_logo.png" alt="PLACE-XP Logo" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'contain' }} />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{
+                  fontFamily: 'Space Grotesk', fontWeight: 700, fontSize: '15px',
+                  color: 'var(--text-primary)'
+                }}>
+                  Tech Marketplace
+                </span>
+                <span style={{
+                  padding: '2px 6px', background: 'rgba(239,68,68,0.15)',
+                  color: '#f87171', borderRadius: '4px', fontSize: '9px', fontWeight: 700,
+                  border: '1px solid rgba(239,68,68,0.2)', letterSpacing: '0.04em',
+                }}>
+                  ADMIN
+                </span>
+              </div>
+              <div style={{
+                fontFamily: 'Space Grotesk',
+                fontSize: '9px',
+                fontWeight: 600,
+                color: 'var(--gold-light)',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                marginTop: '-1px'
+              }}>
+                ENGAGE · EQUIP · EXECUTE
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -330,7 +415,7 @@ export default function AdminAuctionPage() {
                   )}
                 </div>
                 <AnimatePresence mode="wait">
-                  <TechnologyCard key={currentTech?.id ?? 'empty'} technology={currentTech} isLive />
+                  <CardSpread key={currentTech?.id ?? 'empty'} technology={currentTech} isLive />
                 </AnimatePresence>
               </div>
 
@@ -382,14 +467,32 @@ export default function AdminAuctionPage() {
                         {assignError}
                       </div>
                     )}
-                    <button
-                      id="assign-technology-btn"
-                      className="btn btn-success btn-full"
-                      onClick={assignTechnology}
-                      disabled={assigning}
-                    >
-                      {assigning ? <><span className="loader" style={{ width: '16px', height: '16px' }} /> Assigning…</> : '✓ Assign Technology'}
-                    </button>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button
+                        id="assign-technology-btn"
+                        className="btn btn-success"
+                        style={{ flex: 1 }}
+                        onClick={assignTechnology}
+                        disabled={assigning}
+                      >
+                        {assigning ? <><span className="loader" style={{ width: '16px', height: '16px' }} /> Assigning…</> : '✓ Assign Technology'}
+                      </button>
+                      <button
+                        id="skip-technology-btn"
+                        className="btn btn-danger"
+                        style={{
+                          background: 'rgba(239,68,68,0.1)',
+                          border: '1px solid rgba(239,68,68,0.25)',
+                          color: '#f87171',
+                          boxShadow: 'none',
+                          padding: '10px 16px'
+                        }}
+                        onClick={skipCurrentTechnology}
+                        disabled={assigning}
+                      >
+                        ✖ Mark Unsold
+                      </button>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -516,11 +619,9 @@ export default function AdminAuctionPage() {
                         <td>
                           <button
                             className="btn btn-secondary btn-sm"
-                            onClick={async () => {
-                              const purse = prompt(`New purse for ${team.team_name} (current: ₹${team.purse}):`)
-                              if (!purse) return
-                              const n = parseInt(purse)
-                              if (!isNaN(n)) await supabase.from('teams').update({ purse: n }).eq('id', team.id)
+                            onClick={() => {
+                              setEditingTeam(team)
+                              setEditPurseValue(team.purse.toString())
                             }}
                           >
                             Edit
@@ -533,34 +634,54 @@ export default function AdminAuctionPage() {
               </table>
             </div>
 
-            <div className="card">
-              <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px' }}>➕ Add Team</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div>
-                  <label className="label">Team Name</label>
-                  <input
-                    id="new-team-name-input"
-                    className="input"
-                    type="text"
-                    placeholder="e.g. Team Alpha"
-                    value={newTeamName}
-                    onChange={(e) => setNewTeamName(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') addTeam() }}
-                  />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {/* Add Team Card */}
+              <div className="card">
+                <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '16px' }}>➕ Add Team</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label className="label">Team Name</label>
+                    <input
+                      id="new-team-name-input"
+                      className="input"
+                      type="text"
+                      placeholder="e.g. Team Alpha"
+                      value={newTeamName}
+                      onChange={(e) => setNewTeamName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addTeam() }}
+                    />
+                  </div>
+                  <button
+                    id="add-team-btn"
+                    className="btn btn-primary btn-full"
+                    onClick={addTeam}
+                    disabled={addingTeam || !newTeamName.trim()}
+                  >
+                    {addingTeam ? 'Adding…' : '➕ Add Team (₹1,00,000)'}
+                  </button>
                 </div>
+                <div className="divider" />
+                <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                  Each team starts with a purse of ₹1,00,000. You can edit individual purses using the Edit button on the left.
+                </p>
+              </div>
+
+              {/* Danger Zone */}
+              <div className="card" style={{ border: '1px solid rgba(239,68,68,0.25)', background: 'rgba(239,68,68,0.02)' }}>
+                <h3 style={{ fontSize: '15px', fontWeight: 700, marginBottom: '12px', color: '#f87171', fontFamily: 'Space Grotesk' }}>
+                  ⚠️ Danger Zone
+                </h3>
+                <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: '16px' }}>
+                  Wipe all registered teams, delete transaction logs, clear active picks, and reset all technologies to unsold. Use this to restart the event fresh.
+                </p>
                 <button
-                  id="add-team-btn"
-                  className="btn btn-primary btn-full"
-                  onClick={addTeam}
-                  disabled={addingTeam || !newTeamName.trim()}
+                  className="btn btn-danger btn-full"
+                  onClick={resetAuction}
+                  disabled={loading}
                 >
-                  {addingTeam ? 'Adding…' : '➕ Add Team (₹1,00,000)'}
+                  Reset Entire Auction
                 </button>
               </div>
-              <div className="divider" />
-              <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                Each team starts with a purse of ₹1,00,000. You can edit individual purses using the Edit button on the left.
-              </p>
             </div>
           </div>
         )}
@@ -639,6 +760,61 @@ export default function AdminAuctionPage() {
           </div>
         )}
       </main>
+
+      {/* Edit Purse Modal */}
+      <AnimatePresence>
+        {editingTeam && (
+          <div style={{
+            position: 'fixed', inset: 0, zIndex: 100,
+            background: 'rgba(5, 8, 18, 0.8)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+          }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="card glass-elevated"
+              style={{ width: '100%', maxWidth: '400px', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <h3 style={{ fontSize: '18px', fontWeight: 800, marginBottom: '16px', fontFamily: 'Space Grotesk' }}>
+                💰 Adjust Team Purse
+              </h3>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                Set the remaining balance for <strong>{editingTeam.team_name}</strong>.
+              </p>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label className="label">Purse Value (₹)</label>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="e.g. 100000"
+                  value={editPurseValue}
+                  onChange={(e) => setEditPurseValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') savePurseEdit() }}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn btn-secondary btn-full"
+                  onClick={() => setEditingTeam(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-primary btn-full"
+                  onClick={savePurseEdit}
+                  disabled={!editPurseValue.trim() || isNaN(parseInt(editPurseValue))}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

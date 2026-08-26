@@ -225,6 +225,12 @@ code, pre, .font-mono {
   padding-right: 36px;
 }
 
+.input-select option, select option {
+  background-color: #111827; /* Sleek dark background */
+  color: #f3f4f6; /* Legible white text */
+}
+
+
 /* Labels */
 .label {
   display: block;
@@ -432,3 +438,26 @@ code, pre, .font-mono {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+/* ── 3D Card Flip & Perspective Utilities ──────────────────── */
+.perspective-container {
+  perspective: 1000px;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.card-3d-wrapper:hover {
+  transform: translateY(-8px) scale(1.01);
+}
+
+.card-3d-wrapper {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
