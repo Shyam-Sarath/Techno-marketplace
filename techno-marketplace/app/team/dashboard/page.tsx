@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { getSession, clearSession, saveSession } from '@/lib/session'
 import { TechnologyCard } from '@/components/TechnologyCard'
 import { TeamPurseTable } from '@/components/TeamPurseTable'
 import { TechnologyInventory } from '@/components/TechnologyInventory'
@@ -22,12 +23,15 @@ export default function TeamDashboardPage() {
   const [activeTab, setActiveTab] = useState<'live' | 'my-tech' | 'marketplace'>('live')
   const [loading, setLoading] = useState(true)
 
-  const loadData = useCallback(async () => {
-    const { data: { user: u } } = await supabase.auth.getUser()
-    if (!u) { router.push('/login'); return }
+  const session = typeof window !== 'undefined' ? getSession() : null
+  const userName = session?.teamName ?? 'Team'
 
-    const userName = u.user_metadata?.name ?? u.email?.split('@')[0] ?? 'Team'
-    setUser({ name: userName, email: u.email ?? '' })
+  const loadData = useCallback(async () => {
+    const session = getSession()
+    if (!session) { router.replace('/login'); return }
+    if (session.role === 'admin') { router.replace('/admin/auction'); return }
+
+    const name = session.teamName
 
     const [{ data: es }, { data: techs }, { data: ts }] = await Promise.all([
       supabase.from('event_state').select('*').single(),
@@ -39,13 +43,15 @@ export default function TeamDashboardPage() {
     if (techs) setTechnologies(techs)
     if (ts) {
       setTeams(ts)
-      // Match team by name (slug)
-      const slug = userName.toLowerCase().replace(/\s+/g, '-')
+      // Match team by name
       const found = ts.find((t: Team) =>
-        t.team_name.toLowerCase().replace(/\s+/g, '-') === slug ||
-        t.team_name === userName
+        t.team_name.toLowerCase() === name.toLowerCase()
       )
       setMyTeam(found ?? null)
+      // Save teamId back into session if we found it
+      if (found && session?.teamId !== found.id) {
+        saveSession({ ...session!, teamId: found.id })
+      }
     }
 
     if (es?.current_technology_id && techs) {
@@ -132,7 +138,7 @@ export default function TeamDashboardPage() {
 
             <button
               className="btn btn-secondary btn-sm"
-              onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}
+              onClick={() => { clearSession(); router.push('/login') }}
             >
               Sign Out
             </button>

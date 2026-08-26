@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { getSession } from '@/lib/session'
 import type { Team, Technology, EventState } from '@/lib/types'
 
 type SwapStep = 1 | 2 | 3 | 4
@@ -32,6 +33,8 @@ export default function GoldenPowerPage() {
   const [error, setError] = useState('')
 
   const loadData = useCallback(async () => {
+    const session = getSession()
+    if (!session || session.role !== 'admin') { router.replace('/login'); return }
     const [{ data: es }, { data: techs }, { data: ts }] = await Promise.all([
       supabase.from('event_state').select('*').single(),
       supabase.from('technologies').select('*').order('display_order'),

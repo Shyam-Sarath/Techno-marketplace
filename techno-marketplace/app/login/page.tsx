@@ -2,10 +2,14 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createClient } from '@/lib/supabase/client'
+import { saveSession } from '@/lib/session'
 
-type LoginMode = 'auctioneer' | 'team'
+type LoginMode = 'team' | 'auctioneer'
+
+const AUCTIONEER_PASSWORD = 'PLACE-XP-VITC'
+const EVENT_PASSWORD = 'PLACE-XP-2026'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,68 +28,50 @@ export default function LoginPage() {
 
     try {
       if (mode === 'auctioneer') {
-        // Auctioneer login
-        if (password !== 'PLACE-XP-VITC') {
-          setError('Invalid auctioneer password.')
+        // ── Auctioneer login — password only ──────────────
+        if (password !== AUCTIONEER_PASSWORD) {
+          setError('Incorrect auctioneer password.')
           setLoading(false)
           return
         }
-        const { error: authErr } = await supabase.auth.signInWithPassword({
-          email: 'auctioneer@techno-marketplace.app',
-          password: 'PLACE-XP-VITC',
-        })
-        if (authErr) {
-          // If user doesn't exist yet, sign them up
-          const { error: signUpErr } = await supabase.auth.signUp({
-            email: 'auctioneer@techno-marketplace.app',
-            password: 'PLACE-XP-VITC',
-            options: {
-              data: { role: 'admin', name: 'Auctioneer' },
-            },
-          })
-          if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
-          // Sign in again after signup
-          await supabase.auth.signInWithPassword({
-            email: 'auctioneer@techno-marketplace.app',
-            password: 'PLACE-XP-VITC',
-          })
-        }
+
+        saveSession({ role: 'admin', teamName: 'Auctioneer', teamId: null })
         router.push('/admin/auction')
+
       } else {
-        // Team login
-        if (password !== 'PLACE-XP-2026') {
-          setError('Invalid event password.')
-          setLoading(false)
-          return
-        }
+        // ── Team login — team name + event password ────────
         if (!teamName.trim()) {
           setError('Please enter your team name.')
           setLoading(false)
           return
         }
-
-        const slug = teamName.trim().toLowerCase().replace(/\s+/g, '-')
-        const email = `${slug}@techno-marketplace.app`
-
-        const { error: authErr } = await supabase.auth.signInWithPassword({
-          email,
-          password: 'PLACE-XP-2026',
-        })
-
-        if (authErr) {
-          // Register the team on first login
-          const { error: signUpErr } = await supabase.auth.signUp({
-            email,
-            password: 'PLACE-XP-2026',
-            options: {
-              data: { role: 'team', name: teamName.trim() },
-            },
-          })
-          if (signUpErr) { setError(signUpErr.message); setLoading(false); return }
-
-          await supabase.auth.signInWithPassword({ email, password: 'PLACE-XP-2026' })
+        if (password !== EVENT_PASSWORD) {
+          setError('Incorrect event password.')
+          setLoading(false)
+          return
         }
 
+        const name = teamName.trim()
+
+        // Look up team in DB (or create if auto-register is desired)
+        const { data: teams, error: dbErr } = await supabase
+          .from('teams')
+          .select('id, team_name')
+          .ilike('team_name', name)
+          .limit(1)
+
+        if (dbErr) {
+          setError('Could not connect to database. Please check your connection.')
+          setLoading(false)
+          return
+        }
+
+        const team = teams?.[0] ?? null
+        saveSession({
+          role: 'team',
+          teamName: team?.team_name ?? name,
+          teamId: team?.id ?? null,
+        })
         router.push('/team/dashboard')
       }
     } catch {
@@ -108,9 +94,7 @@ export default function LoginPage() {
       }}
     >
       {/* Background orbs */}
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-      }}>
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}>
         <div style={{
           position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)',
           width: '600px', height: '600px',
@@ -131,28 +115,26 @@ export default function LoginPage() {
         transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
         style={{ width: '100%', maxWidth: '440px', zIndex: 1 }}
       >
-        {/* Logo / Header */}
+        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: '36px' }}>
           <div style={{
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             width: '64px', height: '64px', borderRadius: '18px',
             background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
             boxShadow: '0 8px 32px rgba(99,102,241,0.4)',
-            marginBottom: '16px',
-            fontSize: '28px',
+            marginBottom: '16px', fontSize: '28px',
           }}>
             ⚡
           </div>
           <h1 style={{ fontSize: '26px', fontWeight: 800, marginBottom: '6px', letterSpacing: '-0.03em' }}>
-            Tech{' '}
-            <span className="gradient-text">Marketplace</span>
+            Tech <span className="gradient-text">Marketplace</span>
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
             PLACE-XP Auction Platform
           </p>
         </div>
 
-        {/* Mode Toggle */}
+        {/* Mode toggle */}
         <div style={{
           display: 'flex', gap: '6px',
           background: 'rgba(255,255,255,0.04)',
@@ -163,17 +145,22 @@ export default function LoginPage() {
           {(['team', 'auctioneer'] as LoginMode[]).map((m) => (
             <button
               key={m}
+              id={`mode-${m}`}
               onClick={() => { setMode(m); setError('') }}
               style={{
                 flex: 1, padding: '10px', borderRadius: '8px',
-                border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '14px',
+                border: 'none', cursor: 'pointer',
+                fontWeight: 600, fontSize: '14px',
                 fontFamily: 'Space Grotesk, sans-serif',
                 transition: 'all 0.2s ease',
                 background: mode === m
-                  ? (m === 'auctioneer' ? 'linear-gradient(135deg,#6366f1,#4f46e5)' : 'rgba(255,255,255,0.1)')
+                  ? (m === 'auctioneer'
+                    ? 'linear-gradient(135deg,#6366f1,#4f46e5)'
+                    : 'rgba(255,255,255,0.1)')
                   : 'transparent',
                 color: mode === m ? '#fff' : 'var(--text-secondary)',
-                boxShadow: mode === m && m === 'auctioneer' ? '0 4px 12px rgba(99,102,241,0.4)' : 'none',
+                boxShadow: mode === m && m === 'auctioneer'
+                  ? '0 4px 12px rgba(99,102,241,0.4)' : 'none',
               }}
             >
               {m === 'auctioneer' ? '🔨 Auctioneer' : '👥 Team'}
@@ -181,7 +168,7 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* Login Card */}
+        {/* Card */}
         <div className="glass-elevated" style={{ borderRadius: '18px', padding: '28px' }}>
           <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
@@ -217,7 +204,7 @@ export default function LoginPage() {
                 id="password-input"
                 className="input"
                 type="password"
-                placeholder={mode === 'auctioneer' ? 'PLACE-XP-VITC' : 'PLACE-XP-2026'}
+                placeholder={mode === 'auctioneer' ? 'Enter password' : 'Enter event password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -237,8 +224,7 @@ export default function LoginPage() {
                     background: 'rgba(239,68,68,0.1)',
                     border: '1px solid rgba(239,68,68,0.25)',
                     borderRadius: '8px',
-                    color: '#f87171',
-                    fontSize: '13px',
+                    color: '#f87171', fontSize: '13px',
                   }}
                 >
                   {error}
@@ -253,11 +239,10 @@ export default function LoginPage() {
               disabled={loading}
               style={{ marginTop: '4px' }}
             >
-              {loading ? (
-                <><span className="loader" style={{ width: '18px', height: '18px' }} /> Signing in…</>
-              ) : (
-                mode === 'auctioneer' ? '🔨 Enter Auctioneer Panel' : '🚀 Enter Marketplace'
-              )}
+              {loading
+                ? <><span className="loader" style={{ width: '18px', height: '18px' }} /> Signing in…</>
+                : mode === 'auctioneer' ? '🔨 Enter Auctioneer Panel' : '🚀 Enter Marketplace'
+              }
             </button>
           </form>
         </div>

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
+import { getSession, clearSession } from '@/lib/session'
 import { TechnologyCard } from '@/components/TechnologyCard'
 import { TeamPurseTable } from '@/components/TeamPurseTable'
 import { TechnologyInventory } from '@/components/TechnologyInventory'
@@ -31,6 +32,14 @@ export default function AdminAuctionPage() {
 
   const [activeTab, setActiveTab] = useState<'auction' | 'teams' | 'history'>('auction')
   const [loading, setLoading] = useState(true)
+
+  // Guard: only admin can access this page
+  useEffect(() => {
+    const session = getSession()
+    if (!session || session.role !== 'admin') {
+      router.replace('/login')
+    }
+  }, [router])
 
   const teamMap = Object.fromEntries(teams.map((t) => [t.id, t]))
 
@@ -165,8 +174,8 @@ export default function AdminAuctionPage() {
     await loadData()
   }
 
-  async function signOut() {
-    await supabase.auth.signOut()
+  function signOut() {
+    clearSession()
     router.push('/login')
   }
 

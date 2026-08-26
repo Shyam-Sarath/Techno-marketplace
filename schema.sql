@@ -189,90 +189,58 @@ alter table public.golden_swaps        enable row level security;
 alter table public.presentation_orders enable row level security;
 
 -- ── TEAMS ──
--- Anyone authenticated can read teams (teams need to see each other's purses)
 drop policy if exists "teams_read" on public.teams;
-create policy "teams_read"
-  on public.teams for select
-  to authenticated
-  using (true);
-
--- Only admin (auctioneer) can insert/update/delete teams
 drop policy if exists "teams_admin_write" on public.teams;
-create policy "teams_admin_write"
+create policy "teams_open"
   on public.teams for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 -- ── TECHNOLOGIES ──
 drop policy if exists "technologies_read" on public.technologies;
-create policy "technologies_read"
-  on public.technologies for select
-  to authenticated
-  using (true);
-
 drop policy if exists "technologies_admin_write" on public.technologies;
-create policy "technologies_admin_write"
+create policy "technologies_open"
   on public.technologies for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 -- ── EVENT STATE ──
 drop policy if exists "event_state_read" on public.event_state;
-create policy "event_state_read"
-  on public.event_state for select
-  to authenticated
-  using (true);
-
 drop policy if exists "event_state_admin_write" on public.event_state;
-create policy "event_state_admin_write"
+create policy "event_state_open"
   on public.event_state for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 -- ── TRANSACTIONS ──
 drop policy if exists "transactions_read" on public.transactions;
-create policy "transactions_read"
-  on public.transactions for select
-  to authenticated
-  using (true);
-
 drop policy if exists "transactions_admin_write" on public.transactions;
-create policy "transactions_admin_write"
+create policy "transactions_open"
   on public.transactions for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 -- ── GOLDEN SWAPS ──
 drop policy if exists "golden_swaps_read" on public.golden_swaps;
-create policy "golden_swaps_read"
-  on public.golden_swaps for select
-  to authenticated
-  using (true);
-
 drop policy if exists "golden_swaps_admin_write" on public.golden_swaps;
-create policy "golden_swaps_admin_write"
+create policy "golden_swaps_open"
   on public.golden_swaps for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 -- ── PRESENTATION ORDERS ──
 drop policy if exists "presentation_orders_read" on public.presentation_orders;
-create policy "presentation_orders_read"
-  on public.presentation_orders for select
-  to authenticated
-  using (true);
-
 drop policy if exists "presentation_orders_admin_write" on public.presentation_orders;
-create policy "presentation_orders_admin_write"
+create policy "presentation_orders_open"
   on public.presentation_orders for all
-  to authenticated
-  using ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin')
-  with check ((auth.jwt() -> 'user_metadata' ->> 'role') = 'admin');
+  to anon
+  using (true)
+  with check (true);
 
 
 -- ─────────────────────────────────────────────
@@ -348,7 +316,7 @@ create or replace function public.assign_technology(
 )
 returns void
 language plpgsql
-security definer
+security invoker
 as $$
 declare
   v_team_purse integer;

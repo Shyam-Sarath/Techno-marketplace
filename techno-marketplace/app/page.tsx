@@ -1,18 +1,29 @@
-import { redirect } from 'next/navigation'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+'use client'
 
-export default async function Home() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { getSession } from '@/lib/session'
 
-  if (!user) {
-    redirect('/login')
-  }
+export default function Home() {
+  const router = useRouter()
 
-  const role = user.user_metadata?.role
-  if (role === 'admin') {
-    redirect('/admin/auction')
-  } else {
-    redirect('/team/dashboard')
-  }
+  useEffect(() => {
+    const session = getSession()
+    if (!session) {
+      router.replace('/login')
+    } else if (session.role === 'admin') {
+      router.replace('/admin/auction')
+    } else {
+      router.replace('/team/dashboard')
+    }
+  }, [router])
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+    }}>
+      <div className="loader" style={{ width: '40px', height: '40px' }} />
+    </div>
+  )
 }
