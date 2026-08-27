@@ -37,6 +37,13 @@ export default function AdminAuctionPage() {
   const [activeTab, setActiveTab] = useState<'auction' | 'teams' | 'history'>('auction')
   const [loading, setLoading] = useState(true)
 
+  // Reassign modal state
+  const [reassignTx, setReassignTx] = useState<Transaction | null>(null)
+  const [reassignTeamId, setReassignTeamId] = useState('')
+  const [reassignBid, setReassignBid] = useState('')
+  const [reassigning, setReassigning] = useState(false)
+  const [reassignError, setReassignError] = useState('')
+
   // Guard: only admin can access this page
   useEffect(() => {
     const session = getSession()
@@ -241,6 +248,65 @@ export default function AdminAuctionPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  async function reassignTransaction() {
+    if (!reassignTx) return
+    setReassignError('')
+    const newBid = parseInt(reassignBid)
+    if (!reassignTeamId) { setReassignError('Please select a team.'); return }
+    if (isNaN(newBid) || newBid <= 0) { setReassignError('Enter a valid bid amount.'); return }
+
+    const oldTeam = teamMap[reassignTx.team_id]
+    const newTeam = teamMap[reassignTeamId]
+    if (!newTeam) { setReassignError('Team not found.'); return }
+
+    // If reassigning to a different team, check the new team has enough purse
+    const isSameTeam = reassignTx.team_id === reassignTeamId
+    const purseAfterRefund = isSameTeam
+      ? (oldTeam?.purse ?? 0) + reassignTx.bid_amount  // refund old bid first
+      : (newTeam?.purse ?? 0)
+
+    if (newBid > purseAfterRefund + (isSameTeam ? 0 : (oldTeam?.purse ?? 0))) {
+      // For different team: just check new team has enough
+      if (!isSameTeam && newBid > newTeam.purse) {
+        setReassignError(`Bid exceeds ${newTeam.team_name}'s remaining purse of ₹${newTeam.purse.toLocaleString('en-IN')}.`)
+        return
+      }
+    }
+    if (isSameTeam && newBid > purseAfterRefund) {
+      setReassignError(`Bid exceeds ${newTeam.team_name}'s effective purse of ₹${purseAfterRefund.toLocaleString('en-IN')} (after refund).`)
+      return
+    }
+
+    setReassigning(true)
+
+    if (!isSameTeam) {
+      // Refund old team
+      await supabase.from('teams').update({ purse: (oldTeam?.purse ?? 0) + reassignTx.bid_amount }).eq('id', reassignTx.team_id)
+      // Deduct from new team
+      await supabase.from('teams').update({ purse: newTeam.purse - newBid }).eq('id', reassignTeamId)
+    } else {
+      // Same team, just adjust for bid difference
+      const diff = newBid - reassignTx.bid_amount
+      await supabase.from('teams').update({ purse: (oldTeam?.purse ?? 0) - diff }).eq('id', reassignTeamId)
+    }
+
+    // Update the technology ownership
+    await supabase.from('technologies').update({
+      sold_to_team_id: reassignTeamId,
+      sold_price: newBid,
+    }).eq('id', reassignTx.technology_id)
+
+    // Update the transaction record
+    await supabase.from('transactions').update({
+      team_id: reassignTeamId,
+      bid_amount: newBid,
+    }).eq('id', reassignTx.id)
+
+    setReassigning(false)
+    setReassignTx(null)
+    await loadData()
   }
 
   function signOut() {
@@ -728,22 +794,40 @@ export default function AdminAuctionPage() {
                         {new Date(tx.created_at).toLocaleTimeString()}
                       </td>
                       <td>
-                        <button
-                          className="btn btn-danger btn-sm"
-                          onClick={async () => {
-                            if (!confirm('Void this transaction? This will reverse the assignment.')) return
-                            const tech2 = technologies.find((t) => t.id === tx.technology_id)
-                            const team2 = teamMap[tx.team_id]
-                            await Promise.all([
-                              supabase.from('transactions').update({ is_voided: true }).eq('id', tx.id),
-                              supabase.from('technologies').update({ is_sold: false, sold_to_team_id: null, sold_price: null }).eq('id', tx.technology_id),
-                              supabase.from('teams').update({ purse: (team2?.purse ?? 0) + tx.bid_amount }).eq('id', tx.team_id),
-                            ])
-                            await loadData()
-                          }}
-                        >
-                          Void
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            style={{
+                              background: 'rgba(99,102,241,0.12)',
+                              border: '1px solid rgba(99,102,241,0.3)',
+                              color: '#a5b4fc',
+                              boxShadow: 'none',
+                            }}
+                            onClick={() => {
+                              setReassignTx(tx)
+                              setReassignTeamId(tx.team_id)
+                              setReassignBid(tx.bid_amount.toString())
+                              setReassignError('')
+                            }}
+                          >
+                            ✏️ Reassign
+                          </button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={async () => {
+                              if (!confirm('Void this transaction? This will reverse the assignment.')) return
+                              const team2 = teamMap[tx.team_id]
+                              await Promise.all([
+                                supabase.from('transactions').update({ is_voided: true }).eq('id', tx.id),
+                                supabase.from('technologies').update({ is_sold: false, sold_to_team_id: null, sold_price: null }).eq('id', tx.technology_id),
+                                supabase.from('teams').update({ purse: (team2?.purse ?? 0) + tx.bid_amount }).eq('id', tx.team_id),
+                              ])
+                              await loadData()
+                            }}
+                          >
+                            Void
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -814,6 +898,186 @@ export default function AdminAuctionPage() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>
+
+      {/* Reassign Transaction Modal */}
+      <AnimatePresence>
+        {reassignTx && (() => {
+          const rTech = technologies.find((t) => t.id === reassignTx.technology_id)
+          const rOldTeam = teamMap[reassignTx.team_id]
+          return (
+            <div style={{
+              position: 'fixed', inset: 0, zIndex: 100,
+              background: 'rgba(5, 8, 18, 0.85)', backdropFilter: 'blur(10px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px'
+            }}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="card glass-elevated"
+                style={{
+                  width: '100%', maxWidth: '480px',
+                  border: '1px solid rgba(99,102,241,0.25)',
+                  boxShadow: '0 0 40px rgba(99,102,241,0.15)',
+                }}
+              >
+                {/* Header */}
+                <div style={{ marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                    <span style={{ fontSize: '20px' }}>✏️</span>
+                    <h3 style={{ fontSize: '18px', fontWeight: 800, fontFamily: 'Space Grotesk', color: 'var(--text-primary)' }}>
+                      Reassign Technology
+                    </h3>
+                  </div>
+                  <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    Reassign{' '}
+                    <strong style={{ color: 'var(--text-primary)' }}>
+                      {rTech?.is_golden ? '⭐ ' : ''}{rTech?.name ?? 'Unknown'}
+                    </strong>
+                    {' '}to a different team or update the bid amount.
+                  </p>
+                </div>
+
+                {/* Current assignment info */}
+                <div style={{
+                  padding: '12px 14px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  borderRadius: '10px',
+                  marginBottom: '20px',
+                  display: 'flex', gap: '24px',
+                }}>
+                  <div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>Current Team</div>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>{rOldTeam?.team_name ?? '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>Current Bid</div>
+                    <div style={{ fontFamily: 'JetBrains Mono', fontSize: '14px', fontWeight: 700, color: 'var(--gold)' }}>
+                      ₹{reassignTx.bid_amount.toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '4px' }}>Category</div>
+                    <span className={`badge ${reassignTx.phase === 'A' ? 'badge-cat-a' : 'badge-cat-b'}`}>
+                      {reassignTx.phase === 'A' ? 'Core' : 'Support'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Form */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+                  <div>
+                    <label className="label">New Winning Team</label>
+                    <select
+                      id="reassign-team-select"
+                      className="input input-select"
+                      value={reassignTeamId}
+                      onChange={(e) => setReassignTeamId(e.target.value)}
+                    >
+                      <option value="">— Select team —</option>
+                      {teams.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.team_name} — ₹{t.purse.toLocaleString('en-IN')} remaining
+                          {t.id === reassignTx.team_id ? ' (current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">New Bid Amount (₹)</label>
+                    <input
+                      id="reassign-bid-input"
+                      className="input"
+                      type="number"
+                      placeholder="e.g. 62000"
+                      value={reassignBid}
+                      onChange={(e) => setReassignBid(e.target.value)}
+                      min={1}
+                    />
+                  </div>
+
+                  {reassignError && (
+                    <div style={{
+                      padding: '10px 14px',
+                      background: 'rgba(239,68,68,0.1)',
+                      border: '1px solid rgba(239,68,68,0.2)',
+                      borderRadius: '8px',
+                      color: '#f87171', fontSize: '13px',
+                    }}>
+                      {reassignError}
+                    </div>
+                  )}
+
+                  {/* Preview purse changes */}
+                  {reassignTeamId && reassignBid && !isNaN(parseInt(reassignBid)) && (() => {
+                    const newBidNum = parseInt(reassignBid)
+                    const isSame = reassignTeamId === reassignTx.team_id
+                    const oldTeamNew = isSame
+                      ? (rOldTeam?.purse ?? 0) + reassignTx.bid_amount - newBidNum
+                      : (rOldTeam?.purse ?? 0) + reassignTx.bid_amount
+                    const newTeamNew = isSame
+                      ? null
+                      : (teamMap[reassignTeamId]?.purse ?? 0) - newBidNum
+                    return (
+                      <div style={{
+                        padding: '12px 14px',
+                        background: 'rgba(16,185,129,0.06)',
+                        border: '1px solid rgba(16,185,129,0.2)',
+                        borderRadius: '10px',
+                        fontSize: '12px',
+                        color: 'var(--text-secondary)',
+                        lineHeight: 1.7,
+                      }}>
+                        <div style={{ fontWeight: 700, color: 'var(--success)', marginBottom: '6px', fontSize: '11px', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                          📊 Purse Preview
+                        </div>
+                        {!isSame && (
+                          <div>🔄 <strong style={{ color: 'var(--text-primary)' }}>{rOldTeam?.team_name}</strong> refunded → ₹{oldTeamNew.toLocaleString('en-IN')}</div>
+                        )}
+                        {isSame && (
+                          <div>💰 <strong style={{ color: 'var(--text-primary)' }}>{rOldTeam?.team_name}</strong> adjusted → ₹{oldTeamNew.toLocaleString('en-IN')}</div>
+                        )}
+                        {!isSame && newTeamNew !== null && (
+                          <div>💸 <strong style={{ color: 'var(--text-primary)' }}>{teamMap[reassignTeamId]?.team_name}</strong> deducted → ₹{newTeamNew.toLocaleString('en-IN')}</div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </div>
+
+                {/* Actions */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    className="btn btn-secondary btn-full"
+                    onClick={() => {
+                      setReassignTx(null)
+                      setReassignError('')
+                    }}
+                    disabled={reassigning}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    id="confirm-reassign-btn"
+                    className="btn btn-primary btn-full"
+                    onClick={reassignTransaction}
+                    disabled={reassigning || !reassignTeamId || !reassignBid}
+                    style={{
+                      background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                    }}
+                  >
+                    {reassigning
+                      ? <><span className="loader" style={{ width: '16px', height: '16px' }} /> Reassigning…</>
+                      : '✓ Confirm Reassign'
+                    }
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )
+        })()}
       </AnimatePresence>
     </div>
   )
