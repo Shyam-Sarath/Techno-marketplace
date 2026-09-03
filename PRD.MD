@@ -62,17 +62,17 @@ These determine the primary direction/capability of the team's proposed solution
 
 **12 Core Technologies:**
 
-1. AI / Machine Learning
-2. IoT & Sensor Systems
-3. Computer Vision ⭐
-4. Robotics & Autonomous Systems
-5. Predictive & Recommendation Systems
-6. Geospatial Intelligence
-7. Blockchain & Decentralized Systems
-8. Digital Twin & Simulation ⭐
-9. AR / VR & Immersive Systems ⭐
-10. Optimization & Decision Systems
-11. Edge Computing
+1. Computer Vision ⭐
+2. Digital Twin & Simulation ⭐
+3. AR / VR & Immersive Systems ⭐
+4. Geospatial Intelligence
+5. Optimization & Decision Systems
+6. Edge Computing
+7. AI / Machine Learning
+8. IoT & Sensor Systems
+9. Robotics & Autonomous Systems
+10. Predictive & Recommendation Systems
+11. Blockchain & Decentralized Systems
 12. Human-Computer Interaction
 
 ### ⭐ Golden Core Technologies

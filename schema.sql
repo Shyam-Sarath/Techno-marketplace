@@ -270,19 +270,21 @@ on conflict (id) do nothing;
 -- SEED — CATEGORY A  (12 Core Technologies)
 -- ─────────────────────────────────────────────
 insert into public.technologies (name, category, is_golden, display_order) values
-  ('AI / Machine Learning',              'A', false,  1),
-  ('IoT & Sensor Systems',               'A', false,  2),
-  ('Computer Vision',                    'A', true,   3),
-  ('Robotics & Autonomous Systems',      'A', false,  4),
-  ('Predictive & Recommendation Systems','A', false,  5),
-  ('Geospatial Intelligence',            'A', false,  6),
-  ('Blockchain & Decentralized Systems', 'A', false,  7),
-  ('Digital Twin & Simulation',          'A', true,   8),
-  ('AR / VR & Immersive Systems',        'A', true,   9),
-  ('Optimization & Decision Systems',    'A', false, 10),
-  ('Edge Computing',                     'A', false, 11),
+  ('Computer Vision',                    'A', true,   1),
+  ('Digital Twin & Simulation',          'A', true,   2),
+  ('AR / VR & Immersive Systems',        'A', true,   3),
+  ('Geospatial Intelligence',            'A', false,  4),
+  ('Optimization & Decision Systems',    'A', false,  5),
+  ('Edge Computing',                     'A', false,  6),
+  ('AI / Machine Learning',              'A', false,  7),
+  ('IoT & Sensor Systems',               'A', false,  8),
+  ('Robotics & Autonomous Systems',      'A', false,  9),
+  ('Predictive & Recommendation Systems','A', false, 10),
+  ('Blockchain & Decentralized Systems', 'A', false, 11),
   ('Human-Computer Interaction',         'A', false, 12)
-on conflict (name) do nothing;
+on conflict (name) do update set display_order = excluded.display_order, is_golden = excluded.is_golden;
+
+
 
 
 -- ─────────────────────────────────────────────

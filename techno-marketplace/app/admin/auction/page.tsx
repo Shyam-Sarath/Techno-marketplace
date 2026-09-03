@@ -570,54 +570,96 @@ export default function AdminAuctionPage() {
                     🚀 Start Category A Auction
                   </button>
                 )}
-                {phase === 'CATEGORY_A' && catAComplete && (
+
+                {phase === 'CATEGORY_A' && (
                   <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                    <div style={{
-                      textAlign: 'center', padding: '16px',
-                      marginBottom: '16px',
-                      background: 'rgba(6,182,212,0.08)', borderRadius: '12px',
-                      border: '1px solid rgba(6,182,212,0.2)',
-                    }}>
-                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>🧠</div>
-                      <div style={{ fontWeight: 700, color: 'var(--cat-a)', fontSize: '16px' }}>
-                        Category A Complete!
+                    {catAComplete ? (
+                      <div style={{
+                        textAlign: 'center', padding: '16px',
+                        marginBottom: '16px',
+                        background: 'rgba(6,182,212,0.08)', borderRadius: '12px',
+                        border: '1px solid rgba(6,182,212,0.2)',
+                      }}>
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🧠</div>
+                        <div style={{ fontWeight: 700, color: 'var(--cat-a)', fontSize: '16px' }}>
+                          Category A Complete!
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+                          All {catATotal} core technologies have been auctioned.
+                        </div>
                       </div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
-                        All {catATotal} core technologies have been auctioned.
+                    ) : (
+                      <div style={{
+                        textAlign: 'center', padding: '12px',
+                        marginBottom: '16px',
+                        background: 'rgba(59,130,246,0.06)', borderRadius: '10px',
+                        border: '1px solid rgba(59,130,246,0.15)',
+                      }}>
+                        <div style={{ fontWeight: 600, color: 'var(--cat-a)', fontSize: '13px' }}>
+                          Category A Live ({catASold}/{catATotal} auctioned)
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
+                          You can proceed to Category B at any time.
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <button id="start-cat-b-btn" className="btn btn-full btn-lg" style={{
                       background: 'linear-gradient(135deg, var(--cat-b) 0%, #7c3aed 100%)',
                       color: '#fff',
-                    }} onClick={startCategoryB}>
-                      🔧 Start Category B Auction
-                    </button>
-                  </motion.div>
-                )}
-                {phase === 'CATEGORY_B' && catBComplete && (
-                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                    <div style={{
-                      textAlign: 'center', padding: '16px', marginBottom: '16px',
-                      background: 'rgba(245,158,11,0.08)', borderRadius: '12px',
-                      border: '1px solid rgba(245,158,11,0.2)',
+                    }} onClick={() => {
+                      if (catAComplete || confirm(`Category A is currently incomplete (${catASold}/${catATotal} auctioned). Are you sure you want to proceed to Category B Auction now?`)) {
+                        startCategoryB()
+                      }
                     }}>
-                      <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉</div>
-                      <div style={{ fontWeight: 700, color: 'var(--gold)', fontSize: '16px' }}>
-                        Auction Complete!
-                      </div>
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
-                        All technologies have been auctioned. Ready to activate Golden Powers.
-                      </div>
-                    </div>
-                    <button id="finish-auction-btn" className="btn btn-gold btn-full btn-lg" onClick={finishAuction}>
-                      ⭐ Unlock Golden Powers
+                      🔧 Proceed to Category B Auction {catAComplete ? '' : '(Early Transition)'}
                     </button>
                   </motion.div>
                 )}
+
+                {phase === 'CATEGORY_B' && (
+                  <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+                    {catBComplete ? (
+                      <div style={{
+                        textAlign: 'center', padding: '16px', marginBottom: '16px',
+                        background: 'rgba(245,158,11,0.08)', borderRadius: '12px',
+                        border: '1px solid rgba(245,158,11,0.2)',
+                      }}>
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>🎉</div>
+                        <div style={{ fontWeight: 700, color: 'var(--gold)', fontSize: '16px' }}>
+                          Auction Complete!
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '13px', marginTop: '4px' }}>
+                          All technologies have been auctioned. Ready to activate Golden Powers.
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{
+                        textAlign: 'center', padding: '12px', marginBottom: '16px',
+                        background: 'rgba(168,85,247,0.06)', borderRadius: '10px',
+                        border: '1px solid rgba(168,85,247,0.15)',
+                      }}>
+                        <div style={{ fontWeight: 600, color: 'var(--cat-b)', fontSize: '13px' }}>
+                          Category B Live ({catBSold}/{catBTotal} auctioned)
+                        </div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '2px' }}>
+                          You can move to Golden Powers at any time.
+                        </div>
+                      </div>
+                    )}
+                    <button id="finish-auction-btn" className="btn btn-gold btn-full btn-lg" onClick={() => {
+                      if (catBComplete || confirm(`Category B is currently incomplete (${catBSold}/${catBTotal} auctioned). Are you sure you want to move to Golden Powers phase now?`)) {
+                        finishAuction()
+                      }
+                    }}>
+                      ⭐ Move to Golden Powers {catBComplete ? '' : '(Early Transition)'}
+                    </button>
+                  </motion.div>
+                )}
+
                 {(phase === 'GOLDEN_POWER' || phase === 'COMPLETE') && (
                   <div style={{ textAlign: 'center', padding: '20px' }}>
                     <div style={{ fontSize: '28px', marginBottom: '8px' }}>✅</div>
-                    <div style={{ fontWeight: 700, color: 'var(--success)' }}>Auction is complete.</div>
+                    <div style={{ fontWeight: 700, color: 'var(--success)' }}>Auction phase active.</div>
                     <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>
                       Use the Golden Powers panel to perform swaps.
                     </div>
